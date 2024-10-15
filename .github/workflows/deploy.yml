@@ -1,0 +1,122 @@
+name: Deploy to production
+
+# Execute on push
+on:
+  push:
+    branches:
+      - BRANCH_NAME # master, etc.
+
+# Execute on pull request
+# on:
+#   pull_request:
+#     types:
+#       - closed
+#     branches:
+#       - BRANCH_NAME # master, etc.
+
+env:
+  BRANCH_NAME: ${{ github.base_ref || github.ref_name }}
+  REPOSITORY_URL: https://${{ github.actor }}:${{ github.token }}@github.com/${{ github.repository }}.git
+
+jobs:
+  build:
+    name: Deploy
+    runs-on: ubuntu-latest
+    steps:
+
+      # Recommended
+      - name: Checkout
+        uses: actions/checkout@v4.2.1
+        with:
+          fetch-depth: 0
+
+      # Recommended (requires "Checkout" step)
+      - name: Generate version
+        id: version
+        uses: anothrNick/github-tag-action@1.71.0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          WITH_V: true
+
+      # Recommended
+      - name: Enable maintenance mode
+        uses: appleboy/ssh-action@v1.1.0
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USERNAME }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          passphrase: ${{ secrets.SSH_PASSPHRASE }}
+          script: |
+            cd ${{ secrets.PUBLIC_DIR }}
+            wp maintenance-mode activate --force
+
+      # Required
+      - name: Push
+        uses: appleboy/ssh-action@v1.1.0
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USERNAME }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          passphrase: ${{ secrets.SSH_PASSPHRASE }}
+          script: |
+            cd ${{ secrets.REPOSITORY_DIR }}
+            git remote rm origin
+            git remote add origin ${{ env.REPOSITORY_URL }}
+            git --work-tree=${{ secrets.PUBLIC_DIR }} --git-dir=${{ secrets.REPOSITORY_DIR }} fetch origin ${{ env.BRANCH_NAME }} # Fetch the latest changes from GitHub
+            git --work-tree=${{ secrets.PUBLIC_DIR }} --git-dir=${{ secrets.REPOSITORY_DIR }} reset --hard origin/${{ env.BRANCH_NAME }} # Deploy changes to the live site
+
+      # Recommended
+      - name: Flush cache
+        uses: appleboy/ssh-action@v1.1.0
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USERNAME }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          passphrase: ${{ secrets.SSH_PASSPHRASE }}
+          script: |
+            cd ${{ secrets.PUBLIC_DIR }}
+            wp cache flush
+
+      # Optional (recommended if the project uses WP Rocket)
+      - name: Clear WP Rocket cache
+        uses: appleboy/ssh-action@v1.1.0
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USERNAME }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          passphrase: ${{ secrets.SSH_PASSPHRASE }}
+          script: |
+            cd ${{ secrets.PUBLIC_DIR }}
+            wp package install wp-media/wp-rocket-cli:trunk
+            wp rocket clean --confirm
+
+      # Recommended (requires "Generate version" step)
+      - name: Create release
+        uses: softprops/action-gh-release@v2
+        with:
+          name: steps.version.outputs.new_tag
+          tag_name: steps.version.outputs.new_tag
+          target_commitish: ${{ env.BRANCH_NAME }}
+
+      # Optional (recommended if the project uses Sentry)
+      - name: Create Sentry release
+        uses: getsentry/action-release@v1
+        env:
+          SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
+          SENTRY_ORG: ${{ vars.SENTRY_ORG }}
+        with:
+          version: steps.version.outputs.new_tag
+          environment: ${{ vars.SENTRY_ENVIRONMENT }}
+          projects: ${{ vars.SENTRY_PROJECTS }}
+
+      # Recommended (requires "Enable maintenance mode" step)
+      - name: Disable maintenance mode
+        uses: appleboy/ssh-action@v1.1.0
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USERNAME }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          passphrase: ${{ secrets.SSH_PASSPHRASE }}
+          script: |
+            cd ${{ secrets.PUBLIC_DIR }}
+            wp maintenance-mode deactivate
