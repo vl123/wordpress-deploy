@@ -25,3 +25,5 @@
     ```
 
 - Add `.github/workflows/deploy.yml` to the project, setup branch name and disable/enable required steps.
+ 
+- Add `gitignore/.gitignore` to the project and modify it if necessary.
