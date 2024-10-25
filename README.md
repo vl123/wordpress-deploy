@@ -5,7 +5,7 @@
   ssh-keygen -t ed25519 -f ~/.ssh/KEY_NAME -C "KEY_COMMENT"
   ```
 
-- Add public key to `/home/USER_NAME/.ssh/authorized_keys`
+- Add public key to `/home/USER_NAME/.ssh/authorized_keys` on the server.
 
 - Add `SSH_HOST`, `SSH_USERNAME`, `SSH_PRIVATE_KEY`, `SSH_PASSPHRASE`, `PUBLIC_DIR`, `REPOSITORY_DIR` to GitHub secrets.
 
@@ -26,4 +26,4 @@
 
 - Add `.github/workflows/deploy.yml` to the project, setup branch name and disable/enable required steps.
  
-- Add `gitignore/.gitignore` to the project and modify it if necessary.
+- Add `gitignore/.gitignore` to the project root and modify it if necessary.
