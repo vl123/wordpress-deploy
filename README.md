@@ -9,6 +9,8 @@
 
 - Add `SSH_HOST`, `SSH_USERNAME`, `SSH_PRIVATE_KEY`, `SSH_PASSPHRASE`, `PUBLIC_DIR`, `REPOSITORY_DIR` to GitHub secrets.
 
+- Set "Workflow permissions" to read and write in `Settings > Actions > General` within the repository
+
 - Setup bare repository on the server:
 
     ```shell
